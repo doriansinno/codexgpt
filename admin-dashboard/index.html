@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>License Admin Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>License Admin Dashboard</h1>
+        <p class="muted">Verwalte Lizenzschlüssel für die Chrome-Extension.</p>
+      </header>
+
+      <section class="card">
+        <h2>Neue Lizenz erzeugen</h2>
+        <div class="inline">
+          <label for="duration">Laufzeit (Tage)</label>
+          <input id="duration" type="number" min="1" value="30" />
+          <button id="create">Erzeugen</button>
+        </div>
+        <p id="create-result" class="muted"></p>
+      </section>
+
+      <section class="card">
+        <div class="table-head">
+          <h2>Lizenzschlüssel</h2>
+          <button id="refresh">Aktualisieren</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Erstellt</th>
+              <th>Ablauf</th>
+              <th>Status</th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="license-table"></tbody>
+        </table>
+      </section>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

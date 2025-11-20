@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>AI Selection Helper</title>
+  </head>
+  <body>
+    <header>
+      <h1>AI Selection Helper</h1>
+      <p class="status" id="license-status">Lizenz wird geprüft...</p>
+    </header>
+
+    <section class="license-section">
+      <label for="license-input">Lizenzschlüssel</label>
+      <div class="license-row">
+        <input id="license-input" type="text" placeholder="XXXX-XXXX-XXXX" />
+        <button id="save-license">Speichern</button>
+      </div>
+      <p class="helper">Der Schlüssel wird lokal gespeichert.</p>
+    </section>
+
+    <section>
+      <h2>Letzte Anfrage</h2>
+      <p id="last-question" class="muted">Noch keine Auswahl.</p>
+    </section>
+
+    <section>
+      <h2>Antwort</h2>
+      <div id="response" class="response">Keine Antwort vorhanden.</div>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
