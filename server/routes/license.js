@@ -14,19 +14,13 @@ function checkAdmin(req, res) {
   return true;
 }
 
-
-
-
-
 const LICENSE_FILE = path.join(__dirname, "../data/licenses.txt");
 const USERS_FILE = path.join(__dirname, "../data/users.txt");
 
-
+// -------------------- Helpers --------------------
 
 function parseLicense(line) {
   const [key, createdAt, expiresAt, active] = line.trim().split(";");
-
-
   if (!key) return null;
   return { key, createdAt, expiresAt, active: active === "true" };
 }
@@ -38,10 +32,7 @@ function serializeLicense(license) {
 async function readLicenses() {
   try {
     const content = await fs.readFile(LICENSE_FILE, "utf8");
-    return content
-      .split("\n")
-      .map(parseLicense)
-      .filter(Boolean);
+    return content.split("\n").map(parseLicense).filter(Boolean);
   } catch (error) {
     if (error.code === "ENOENT") return [];
     throw error;
@@ -64,12 +55,17 @@ function isExpired(expiresAt) {
 async function validateLicenseKey(key) {
   const licenses = await readLicenses();
   const license = licenses.find((l) => l.key === key);
+
   if (!license) return { valid: false, message: "Lizenz nicht gefunden" };
   if (!license.active) return { valid: false, message: "Lizenz deaktiviert" };
   if (isExpired(license.expiresAt)) return { valid: false, message: "Lizenz abgelaufen" };
+
   return { valid: true, license };
 }
 
+// -------------------- ROUTES --------------------
+
+// Validate (ohne Admin, User benutzt das)
 router.post("/validate", async (req, res) => {
   try {
     const { key } = req.body;
@@ -81,12 +77,15 @@ router.post("/validate", async (req, res) => {
   }
 });
 
+// Create (admin)
 router.post("/create", async (req, res) => {
   if (!checkAdmin(req, res)) return;
+
   try {
     const durationDays = Number(req.body?.durationDays) || 30;
     const now = new Date();
     const expires = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
     const licenses = await readLicenses();
     const newLicense = {
       key: generateKey(),
@@ -94,8 +93,10 @@ router.post("/create", async (req, res) => {
       expiresAt: expires.toISOString(),
       active: true
     };
+
     licenses.push(newLicense);
     await writeLicenses(licenses);
+
     res.json({ message: "Lizenz erstellt", license: newLicense });
   } catch (error) {
     console.error("Create error", error);
@@ -103,17 +104,20 @@ router.post("/create", async (req, res) => {
   }
 });
 
-
-
+// Deactivate (admin)
 router.post("/deactivate", async (req, res) => {
   if (!checkAdmin(req, res)) return;
+
   try {
     const { key } = req.body;
     const licenses = await readLicenses();
     const target = licenses.find((l) => l.key === key);
+
     if (!target) return res.status(404).json({ message: "Lizenz nicht gefunden" });
+
     target.active = false;
     await writeLicenses(licenses);
+
     res.json({ message: "Lizenz deaktiviert" });
   } catch (error) {
     console.error("Deactivate error", error);
@@ -121,9 +125,10 @@ router.post("/deactivate", async (req, res) => {
   }
 });
 
-
-router.get("/all", async (_req, res) => {
+// List all (admin)
+router.get("/all", async (req, res) => {
   if (!checkAdmin(req, res)) return;
+
   try {
     const licenses = await readLicenses();
     res.json({ licenses });
@@ -133,14 +138,18 @@ router.get("/all", async (_req, res) => {
   }
 });
 
-
+// Delete (admin)
 router.delete("/:key", async (req, res) => {
   if (!checkAdmin(req, res)) return;
+
   try {
     const { key } = req.params;
     const licenses = await readLicenses();
     const filtered = licenses.filter((l) => l.key !== key);
-    if (filtered.length === licenses.length) return res.status(404).json({ message: "Lizenz nicht gefunden" });
+
+    if (filtered.length === licenses.length)
+      return res.status(404).json({ message: "Lizenz nicht gefunden" });
+
     await writeLicenses(filtered);
     res.json({ message: "Lizenz gelöscht" });
   } catch (error) {
@@ -148,19 +157,18 @@ router.delete("/:key", async (req, res) => {
     res.status(500).json({ message: "Serverfehler" });
   }
 });
- 
 
-
-router.get("/users/all", (req, res) => {
+// Users (admin)
+router.get("/users/all", async (req, res) => {
   if (!checkAdmin(req, res)) return;
+
   try {
-    const data = fs.readFileSync("data/users.txt", "utf8");
+    const data = await fs.readFile(USERS_FILE, "utf8");
     res.type("text/plain").send(data || "Keine Benutzer gespeichert.");
   } catch (err) {
+    console.error("users/all error", err);
     res.status(500).send("Fehler beim Lesen der users.txt");
   }
 });
-
-
 
 module.exports = { router, validateLicenseKey, readLicenses, writeLicenses };
