@@ -49,6 +49,17 @@ async function sendToApi(text) {
       lastQuestion: text,
       licenseStatus: { valid: false, reason: "Anfrage fehlgeschlagen" }
     });
+
+    // Antwort an die aktive Webseite senden → zeigt Overlay an
+chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  if (tabs[0]?.id) {
+    chrome.tabs.sendMessage(tabs[0].id, {
+      type: "ai_response",
+      text: message
+    });
+  }
+});
+
   }
 }
 

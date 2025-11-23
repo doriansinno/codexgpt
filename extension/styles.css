@@ -96,3 +96,36 @@ button:hover {
   color: #52606d;
   font-size: 13px;
 }
+#ai-helper-overlay {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 380px;
+  max-height: 500px;
+  overflow-y: auto;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 25px rgba(0,0,0,0.25);
+  z-index: 999999;
+  font-family: Arial, sans-serif;
+}
+
+.ai-helper-box {
+  position: relative;
+}
+
+#ai-helper-close {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+}
