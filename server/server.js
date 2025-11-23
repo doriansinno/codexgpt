@@ -19,6 +19,19 @@ app.use("/license", licenseRoutes);
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
+// ADMIN SCHUTZ
+app.use((req, res, next) => {
+  if (req.path.startsWith("/admin")) {
+    if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
+      return res.status(403).send("Zugriff verweigert");
+    }
+  }
+  next();
+});
+
+
+
+
 app.use(express.static(path.join(__dirname, "../admin-dashboard")));
 
 app.use((err, _req, res, _next) => {
