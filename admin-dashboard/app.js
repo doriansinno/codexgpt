@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://codexgpt-dh73.onrender.com";
 
 const tableBody = document.getElementById("license-table");
 const refreshBtn = document.getElementById("refresh");

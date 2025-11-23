@@ -1,6 +1,6 @@
 // Background service worker: handles license validation, messaging, and API requests
-const API_BASE = "http://localhost:3000";
-
+//const API_BASE = "http://localhost:3000";
+const API_BASE = "https://codexgpt-dh73.onrender.com";
 async function validateLicense(storedKey) {
   if (!storedKey) return { valid: false, reason: "Kein Lizenzschlüssel gespeichert." };
   try {

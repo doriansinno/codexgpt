@@ -9,7 +9,8 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://codexgpt-dh73.onrender.com/*"
   ],
   "background": {
     "service_worker": "background.js"
