@@ -1,6 +1,6 @@
 // Background service worker: handles license validation, messaging, and API requests
+//const API_BASE = "http://localhost:3000";
 const API_BASE = "https://codexgpt-dh73.onrender.com";
-
 async function validateLicense(storedKey) {
   if (!storedKey) return { valid: false, reason: "Kein Lizenzschlüssel gespeichert." };
   try {
@@ -10,7 +10,7 @@ async function validateLicense(storedKey) {
       body: JSON.stringify({ key: storedKey })
     });
     const data = await res.json();
-    return data.valid ? { valid: true } : { valid: false, reason: data.message || "Lizenz ungültig." };
+    return data.valid ? { valid: true } : { valid: false, reason: data.message || "Lizenz ungültig" };
   } catch (error) {
     console.error("Lizenzprüfung fehlgeschlagen", error);
     return { valid: false, reason: "Server nicht erreichbar." };
@@ -20,23 +20,11 @@ async function validateLicense(storedKey) {
 async function sendToApi(text) {
   const { licenseKey } = await chrome.storage.local.get(["licenseKey"]);
   const license = await validateLicense(licenseKey);
-
   if (!license.valid) {
-    // Antwort speichern
     await chrome.storage.local.set({
       lastResponse: "Lizenz ungültig oder abgelaufen.",
       lastQuestion: text,
       licenseStatus: license
-    });
-
-    // AN CONTENT SCHICKEN
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: "ai_response",
-          text: "Lizenz ungültig oder abgelaufen."
-        });
-      }
     });
     return;
   }
@@ -47,43 +35,31 @@ async function sendToApi(text) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, licenseKey })
     });
-
     const data = await response.json();
     const message = data.answer || data.message || "Keine Antwort erhalten.";
-
     await chrome.storage.local.set({
       lastResponse: message,
       lastQuestion: text,
       licenseStatus: { valid: true }
     });
-
-    // AN CONTENT SCHICKEN
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: "ai_response",
-          text: message
-        });
-      }
-    });
-
   } catch (error) {
     console.error("Anfrage fehlgeschlagen", error);
-
     await chrome.storage.local.set({
       lastResponse: "Fehler beim Abrufen der Antwort.",
       lastQuestion: text,
-      licenseStatus: { valid: false, reason: "Anfrage fehlgeschlagen." }
+      licenseStatus: { valid: false, reason: "Anfrage fehlgeschlagen" }
     });
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: "ai_response",
-          text: "Fehler beim Abrufen der Antwort."
-        });
-      }
+    // Antwort an die aktive Webseite senden → zeigt Overlay an
+chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  if (tabs[0]?.id) {
+    chrome.tabs.sendMessage(tabs[0].id, {
+      type: "ai_response",
+      text: message
     });
+  }
+});
+
   }
 }
 
@@ -98,7 +74,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       await chrome.storage.local.set({ licenseStatus: status });
       sendResponse(status);
     });
-    return true;
+    return true; // keep sendResponse alive
   }
 
   if (message.type === "getStatus") {

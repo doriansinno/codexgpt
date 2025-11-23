@@ -18,12 +18,14 @@ router.post("/", async (req, res) => {
     }
 
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "Du bist ein hilfreicher Assistent." },
-        { role: "user", content: text }
-      ]
-    });
+  model: "gpt-4o-mini",
+  max_tokens: 200,  // << LIMIT AUF 200 TOKENS
+  messages: [
+    { role: "system", content: "Gib deine Antworten so kurz, klar und strukturiert wie möglich aus." },
+    { role: "user", content: text }
+  ]
+});
+
 
     const answer = completion.choices?.[0]?.message?.content || "Keine Antwort";
     res.json({ answer });

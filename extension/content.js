@@ -1,44 +1,48 @@
-// Content script: captures selected text and sends it to the background script
-
+// ---- OVERLAY ----
 function showOverlay(responseText) {
-    // Existierendes Overlay löschen
-    const old = document.getElementById("ai-helper-overlay");
-    if (old) old.remove();
+  const old = document.getElementById("ai-helper-overlay");
+  if (old) old.remove();
 
-    // Neues Overlay erstellen
-    const overlay = document.createElement("div");
-    overlay.id = "ai-helper-overlay";
-    overlay.innerHTML = `
-        <div class="ai-helper-box">
-            <button id="ai-helper-close">X</button>
-            <pre>${responseText}</pre>
-        </div>
-    `;
+  const overlay = document.createElement("div");
+  overlay.id = "ai-helper-overlay";
+  overlay.innerHTML = `
+    <div class="ai-helper-box">
+        <button id="ai-helper-close">X</button>
+        <pre>${responseText}</pre>
+    </div>
+  `;
 
-    document.body.appendChild(overlay);
+  document.body.appendChild(overlay);
 
-    // Schließen
-    document.getElementById("ai-helper-close").addEventListener("click", () => {
-        overlay.remove();
-    });
+  document.getElementById("ai-helper-close").addEventListener("click", () => {
+    overlay.remove();
+  });
 }
 
+let selectionTimeout = null;
+
+// Wird ausgelöst, wenn der Nutzer Text markiert & die Maus loslässt
+document.addEventListener("mouseup", () => {
+  clearTimeout(selectionTimeout);
+  selectionTimeout = setTimeout(() => {
+    const text = window.getSelection().toString().trim();
+    if (text.length > 0) {
+      chrome.runtime.sendMessage({ type: "selection", text });
+    }
+  }, 150);
+});
 
 
-
-(function () {
-  function getSelectedText() {
-    const selection = window.getSelection();
-    return selection ? selection.toString().trim() : "";
+// ---- RECEIVE AI RESPONSE ----
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "ai_response") {
+    showOverlay(msg.text);
   }
+});
 
-  function handleSelection() {
-    const text = getSelectedText();
-    if (!text) return;
-
-    chrome.runtime.sendMessage({ type: "selection", text });
-  }
-
-  document.addEventListener("mouseup", () => setTimeout(handleSelection, 10));
-  document.addEventListener("keyup", () => setTimeout(handleSelection, 10));
-})();
+document.addEventListener("keydown", (e) => {
+    if (e.key === "x" || e.key === "X") {
+        const old = document.getElementById("ai-helper-overlay");
+        if (old) old.remove();
+    }
+});
