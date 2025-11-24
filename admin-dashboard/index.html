@@ -15,11 +15,16 @@
 
       <section class="card">
         <h2>Neue Lizenz erzeugen</h2>
+
+        <label for="owner">Name des Käufers</label>
+        <input id="owner" type="text" placeholder="Name eintragen …" />
+
         <div class="inline">
           <label for="duration">Laufzeit (Tage)</label>
           <input id="duration" type="number" min="1" value="30" />
           <button id="create">Erzeugen</button>
         </div>
+
         <p id="create-result" class="muted"></p>
       </section>
 
@@ -28,13 +33,17 @@
           <h2>Lizenzschlüssel</h2>
           <button id="refresh">Aktualisieren</button>
         </div>
+
         <table>
           <thead>
             <tr>
               <th>Key</th>
+              <th>Name</th>
               <th>Erstellt</th>
               <th>Ablauf</th>
-              <th>Status</th>
+              <th>Aktiv</th>
+              <th>Benutzt</th>
+              <th>Aktiviert am</th>
               <th>Aktionen</th>
             </tr>
           </thead>

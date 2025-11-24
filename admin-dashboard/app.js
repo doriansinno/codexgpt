@@ -4,9 +4,11 @@ const tableBody = document.getElementById("license-table");
 const refreshBtn = document.getElementById("refresh");
 const createBtn = document.getElementById("create");
 const durationInput = document.getElementById("duration");
+const ownerInput = document.getElementById("owner");
 const resultEl = document.getElementById("create-result");
 
 function formatDate(dateString) {
+  if (!dateString) return "-";
   return new Date(dateString).toLocaleString();
 }
 
@@ -29,9 +31,12 @@ async function renderTable() {
       (license) => `
         <tr>
           <td>${license.key}</td>
+          <td>${license.ownerName || "-"}</td>
           <td>${formatDate(license.createdAt)}</td>
           <td>${formatDate(license.expiresAt)}</td>
           <td>${badge(license.active)}</td>
+          <td>${license.used ? "✔️" : "❌"}</td>
+          <td>${formatDate(license.activatedAt)}</td>
           <td class="actions">
             <button class="danger" data-key="${license.key}" data-action="delete">Löschen</button>
             <button data-key="${license.key}" data-action="deactivate">Deaktivieren</button>
@@ -44,17 +49,24 @@ async function renderTable() {
 
 async function createLicense() {
   const durationDays = Number(durationInput.value) || 30;
+  const ownerName = ownerInput.value.trim();
+
   const res = await fetch(`${API_BASE}/license/create`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ durationDays })
+    headers: { 
+      "Content-Type": "application/json",
+      "x-admin-key": localStorage.getItem("adminKey")
+    },
+    body: JSON.stringify({ durationDays, ownerName })
   });
+
   const data = await res.json();
   if (res.ok) {
     resultEl.textContent = `Neuer Schlüssel: ${data.license.key}`;
   } else {
     resultEl.textContent = data.message || "Fehler beim Erzeugen";
   }
+
   await renderTable();
 }
 
@@ -64,13 +76,19 @@ async function handleTableClick(event) {
   if (!action || !key) return;
 
   if (action === "delete") {
-    await fetch(`${API_BASE}/license/${key}`, { method: "DELETE" });
+    await fetch(`${API_BASE}/license/${key}`, { 
+      method: "DELETE",
+      headers: { "x-admin-key": localStorage.getItem("adminKey") }
+    });
   }
 
   if (action === "deactivate") {
     await fetch(`${API_BASE}/license/deactivate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "x-admin-key": localStorage.getItem("adminKey")
+      },
       body: JSON.stringify({ key })
     });
   }
