@@ -5,7 +5,9 @@ const crypto = require("crypto");
 
 const router = express.Router();
 
-// ADMIN SCHUTZ
+// -------------------------------------------------------------
+// ADMIN CHECK
+// -------------------------------------------------------------
 function checkAdmin(req, res) {
   if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
     res.status(403).json({ error: "Keine Berechtigung" });
@@ -14,19 +16,55 @@ function checkAdmin(req, res) {
   return true;
 }
 
+// -------------------------------------------------------------
+// DATEIPFAD KONSTANTEN
+// -------------------------------------------------------------
 const LICENSE_FILE = path.join(__dirname, "../data/licenses.txt");
 const USERS_FILE = path.join(__dirname, "../data/users.txt");
 
-// -------------------- Helpers --------------------
+// -------------------------------------------------------------
+// HILFSFUNKTIONEN
+// -------------------------------------------------------------
 
+// VARIANTE B FORMAT:
+// key;createdAt;expiresAt;active;used;ownerName;activatedAt
 function parseLicense(line) {
-  const [key, createdAt, expiresAt, active] = line.trim().split(";");
+  const parts = line.trim().split(";");
+
+  // Alte Keys ohne Erweiterung unterstützen
+  const [key, createdAt, expiresAt, active, used, ownerName, activatedAt] = [
+    parts[0],
+    parts[1],
+    parts[2],
+    parts[3],
+    parts[4] || "false",
+    parts[5] || "",
+    parts[6] || ""
+  ];
+
   if (!key) return null;
-  return { key, createdAt, expiresAt, active: active === "true" };
+
+  return {
+    key,
+    createdAt,
+    expiresAt,
+    active: active === "true",
+    used: used === "true",
+    ownerName,
+    activatedAt
+  };
 }
 
 function serializeLicense(license) {
-  return `${license.key};${license.createdAt};${license.expiresAt};${license.active}`;
+  return [
+    license.key,
+    license.createdAt,
+    license.expiresAt,
+    license.active,
+    license.used,
+    license.ownerName || "",
+    license.activatedAt || ""
+  ].join(";");
 }
 
 async function readLicenses() {
@@ -40,8 +78,7 @@ async function readLicenses() {
 }
 
 async function writeLicenses(list) {
-  const content = list.map(serializeLicense).join("\n");
-  await fs.writeFile(LICENSE_FILE, content, "utf8");
+  await fs.writeFile(LICENSE_FILE, list.map(serializeLicense).join("\n"), "utf8");
 }
 
 function generateKey() {
@@ -54,22 +91,39 @@ function isExpired(expiresAt) {
 
 async function validateLicenseKey(key) {
   const licenses = await readLicenses();
-  const license = licenses.find((l) => l.key === key);
+  const lic = licenses.find((l) => l.key === key);
 
-  if (!license) return { valid: false, message: "Lizenz nicht gefunden" };
-  if (!license.active) return { valid: false, message: "Lizenz deaktiviert" };
-  if (isExpired(license.expiresAt)) return { valid: false, message: "Lizenz abgelaufen" };
+  if (!lic) return { valid: false, message: "Lizenz nicht gefunden" };
+  if (!lic.active) return { valid: false, message: "Lizenz deaktiviert" };
+  if (isExpired(lic.expiresAt)) return { valid: false, message: "Lizenz abgelaufen" };
+  if (lic.used) return { valid: false, message: "Lizenz wurde bereits aktiviert" };
 
-  return { valid: true, license };
+  return { valid: true, license: lic };
 }
 
-// -------------------- ROUTES --------------------
+// -------------------------------------------------------------
+// ROUTES
+// -------------------------------------------------------------
 
-// Validate (ohne Admin, User benutzt das)
+// ------------------------
+// VALIDATE (User-Anfrage)
+// ------------------------
 router.post("/validate", async (req, res) => {
   try {
     const { key } = req.body;
     const result = await validateLicenseKey(key);
+
+    // Wenn gültig → LICHTER AN für „nur einmal benutzen“
+    if (result.valid) {
+      const licenses = await readLicenses();
+      const lic = licenses.find((l) => l.key === key);
+
+      lic.used = true;
+      lic.activatedAt = new Date().toISOString();
+
+      await writeLicenses(licenses);
+    }
+
     res.json(result);
   } catch (error) {
     console.error("Validate error", error);
@@ -77,21 +131,29 @@ router.post("/validate", async (req, res) => {
   }
 });
 
-// Create (admin)
+// ------------------------
+// CREATE (Admin)
+// ------------------------
 router.post("/create", async (req, res) => {
   if (!checkAdmin(req, res)) return;
 
   try {
+    const { ownerName } = req.body;
     const durationDays = Number(req.body?.durationDays) || 30;
+
     const now = new Date();
-    const expires = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const expires = new Date(now.getTime() + durationDays * 86400000);
 
     const licenses = await readLicenses();
+
     const newLicense = {
       key: generateKey(),
       createdAt: now.toISOString(),
       expiresAt: expires.toISOString(),
-      active: true
+      active: true,
+      used: false,
+      ownerName: ownerName || "",
+      activatedAt: ""
     };
 
     licenses.push(newLicense);
@@ -104,20 +166,23 @@ router.post("/create", async (req, res) => {
   }
 });
 
-// Deactivate (admin)
+// ------------------------
+// DEACTIVATE (Admin)
+// ------------------------
 router.post("/deactivate", async (req, res) => {
   if (!checkAdmin(req, res)) return;
 
   try {
     const { key } = req.body;
+
     const licenses = await readLicenses();
-    const target = licenses.find((l) => l.key === key);
+    const lic = licenses.find((l) => l.key === key);
 
-    if (!target) return res.status(404).json({ message: "Lizenz nicht gefunden" });
+    if (!lic) return res.status(404).json({ message: "Lizenz nicht gefunden" });
 
-    target.active = false;
+    lic.active = false;
+
     await writeLicenses(licenses);
-
     res.json({ message: "Lizenz deaktiviert" });
   } catch (error) {
     console.error("Deactivate error", error);
@@ -125,7 +190,9 @@ router.post("/deactivate", async (req, res) => {
   }
 });
 
-// List all (admin)
+// ------------------------
+// LIST ALL (Admin)
+// ------------------------
 router.get("/all", async (req, res) => {
   if (!checkAdmin(req, res)) return;
 
@@ -138,12 +205,15 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// Delete (admin)
+// ------------------------
+// DELETE (Admin)
+// ------------------------
 router.delete("/:key", async (req, res) => {
   if (!checkAdmin(req, res)) return;
 
   try {
     const { key } = req.params;
+
     const licenses = await readLicenses();
     const filtered = licenses.filter((l) => l.key !== key);
 
@@ -158,7 +228,9 @@ router.delete("/:key", async (req, res) => {
   }
 });
 
-// Users (admin)
+// ------------------------
+// USERS TRACKING (Admin)
+// ------------------------
 router.get("/users/all", async (req, res) => {
   if (!checkAdmin(req, res)) return;
 
