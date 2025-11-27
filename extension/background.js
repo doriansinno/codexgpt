@@ -4,19 +4,29 @@ const API_BASE = "https://codexgpt-dh73.onrender.com";
 /* -------------------------------------------------------
    1) Lizenz-Validierung – gibt KOMPLETTE Lizenz zurück
 ------------------------------------------------------- */
+async function getClientId() {
+  let { clientId } = await chrome.storage.local.get(["clientId"]);
+  if (!clientId) {
+    clientId = crypto.randomUUID();
+    await chrome.storage.local.set({ clientId });
+  }
+  return clientId;
+}
+
+
 async function validateLicense(storedKey) {
   if (!storedKey) return { valid: false, message: "Kein Lizenzschlüssel gespeichert." };
+
+  const clientId = await getClientId();
 
   try {
     const res = await fetch(`${API_BASE}/license/validate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: storedKey })
+      body: JSON.stringify({ key: storedKey, clientId })
     });
 
     const data = await res.json();
-
-    // WICHTIG: komplette Antwort zurückgeben (nicht nur valid:true)
     return data;
 
   } catch (error) {
@@ -24,6 +34,7 @@ async function validateLicense(storedKey) {
     return { valid: false, message: "Server nicht erreichbar." };
   }
 }
+
 
 /* -------------------------------------------------------
    2) Anfrage an AI schicken
@@ -113,16 +124,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   // Lizenz speichern & sofort validieren
   if (message.type === "setLicense") {
-    chrome.storage.local.set({ licenseKey: message.key }, async () => {
-      const status = await validateLicense(message.key);
+  chrome.storage.local.set({ licenseKey: message.key }, async () => {
+    const clientId = await getClientId();
+    const activation = await fetch(`${API_BASE}/license/activate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: message.key, clientId })
+    }).then(r => r.json());
 
-      await chrome.storage.local.set({ licenseStatus: status });
+    sendResponse(activation);
+  });
 
-      sendResponse(status);
-    });
+  return true;
+}
 
-    return true; // sendResponse async offen halten
-  }
 
   // Status abrufen → IMMER NEU validieren
   if (message.type === "getStatus") {

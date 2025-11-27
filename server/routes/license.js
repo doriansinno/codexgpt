@@ -99,15 +99,28 @@ async function validateLicenseKey(key) {
 
 // Validate – wird von der Extension benutzt, ändert nichts mehr an der Lizenz
 router.post("/validate", async (req, res) => {
-  try {
-    const { key } = req.body;
-    const result = await validateLicenseKey(key);
-    res.json(result);
-  } catch (error) {
-    console.error("Validate error", error);
-    res.status(500).json({ valid: false, message: "Serverfehler" });
+  const { key, clientId } = req.body;
+
+  const result = await validateLicenseKey(key);
+  if (!result.valid) return res.json(result);
+
+  const users = await readUsers();
+  const usedBy = users.find(u => u.key === key);
+
+  if (!usedBy) {
+    return res.json({ valid: false, message: "Lizenz wurde noch nicht aktiviert" });
   }
+
+  if (usedBy.clientId !== clientId) {
+    return res.json({
+      valid: false,
+      message: "Lizenz wurde bereits auf anderem Gerät aktiviert"
+    });
+  }
+
+  res.json({ valid: true });
 });
+
 
 // Create (Admin)
 router.post("/create", async (req, res) => {
@@ -207,5 +220,80 @@ router.get("/users/all", async (req, res) => {
     res.status(500).send("Fehler beim Lesen der users.txt");
   }
 });
+// --------------------------------------
+// NEW: LICENSE ACTIVATION (one-time use)
+// --------------------------------------
+router.post("/activate", async (req, res) => {
+  const { key, clientId } = req.body;
+
+  if (!key || !clientId) {
+    return res.json({ valid: false, message: "Key oder ClientID fehlt" });
+  }
+
+  const licenses = await readLicenses();
+  const lic = licenses.find(l => l.key === key);
+
+  if (!lic) return res.json({ valid: false, message: "Lizenz existiert nicht" });
+  if (!lic.active) return res.json({ valid: false, message: "Lizenz deaktiviert" });
+
+  const users = await readUsers();
+
+  const usedBy = users.find(u => u.key === key);
+
+  // Key bereits auf anderem Gerät aktiviert
+  if (usedBy && usedBy.clientId !== clientId) {
+    return res.json({
+      valid: false,
+      message: "Lizenz wurde bereits auf einem anderen Gerät verwendet"
+    });
+  }
+
+  // Key bereits auf diesem Gerät aktiviert → OK
+  if (usedBy && usedBy.clientId === clientId) {
+    return res.json({
+      valid: true,
+      message: "Lizenz bereits auf diesem Gerät aktiviert"
+    });
+  }
+
+  // Noch nicht aktiviert → jetzt aktivieren
+  users.push({
+    clientId,
+    key,
+    activatedAt: new Date().toISOString()
+  });
+
+  await writeUsers(users);
+
+  res.json({
+    valid: true,
+    message: "Lizenz erfolgreich aktiviert"
+  });
+});
+
+// HELPERS FOR USERS
+async function readUsers() {
+  try {
+    const txt = await fs.readFile(USERS_FILE, "utf8");
+    return txt
+      .split("\n")
+      .map(line => {
+        const [clientId, key, activatedAt] = line.trim().split(";");
+        if (!clientId || !key) return null;
+        return { clientId, key, activatedAt };
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function writeUsers(users) {
+  const txt = users
+    .map(u => `${u.clientId};${u.key};${u.activatedAt}`)
+    .join("\n");
+  await fs.writeFile(USERS_FILE, txt, "utf8");
+}
+
 
 module.exports = { router, validateLicenseKey, readLicenses, writeLicenses };
